@@ -50,6 +50,27 @@ bool DmpAlgBgoHits::GetDyCoePar(){
     DyCoePar_58[l][b][s][1]=fBgoDyCoe->Inc_Dy8vsDy5[i];
     DyCoePar_25[l][b][s][0]=fBgoDyCoe->Slp_Dy5vsDy2[i];
     DyCoePar_25[l][b][s][1]=fBgoDyCoe->Inc_Dy5vsDy2[i];
+  //  std::cout<<"Layer:"<<l<<" Bar:"<<b<<" Side:"<<s<<std::endl;
+  //  std::cout<<"***"<<DyCoePar_58[l][b][s][0]<<std::endl;
+  }
+  long nentries=Dytree->GetEntries();
+  if(nentries==2){
+  Dytree->GetEntry(1);
+  short nPmts=(short)fBgoDyCoe->GlobalPMTID.size();
+  for(short i=0;i<nPmts; ++i){
+    gid=fBgoDyCoe->GlobalPMTID[i];
+    l=DmpBgoBase::GetLayerID(gid);
+    b=DmpBgoBase::GetBarID(gid);
+    s=DmpBgoBase::GetSideID(gid);
+ //   DyCoePar_58[l][b][s][0]=fBgoDyCoe->Slp_Dy8vsDy5[i];
+ //   DyCoePar_58[l][b][s][1]=fBgoDyCoe->Inc_Dy8vsDy5[i];
+    DyCoePar_25[l][b][s][0]=fBgoDyCoe->Slp_Dy5vsDy2[i];
+    DyCoePar_25[l][b][s][1]=fBgoDyCoe->Inc_Dy5vsDy2[i];
+  //  std::cout<<"Layer:"<<l<<" Bar:"<<b<<" Side:"<<s<<std::endl;
+  //  std::cout<<"***"<<DyCoePar_58[l][b][s][0]<<std::endl;
+  }
+
+
   }
   delete Dytree;
   delete fDyPar;
@@ -171,7 +192,7 @@ bool DmpAlgBgoHits::Initialize(){
   fPsdHits = new DmpEvtBgoHits();
   gDataBuffer->RegisterObject("Event/Cal/PsdHits",fPsdHits,"DmpEvtBgoHits");
   
-  gDataBuffer->RegisterObject("Event/Cal/EventHeader",fEvtHeader,"DmpEvtHeader");
+  //gDataBuffer->RegisterObject("Event/Cal/EventHeader",fEvtHeader,"DmpEvtHeader");
 
         bool prepareDyCoePar=GetDyCoePar();
 	if(!prepareDyCoePar){
@@ -217,7 +238,7 @@ bool DmpAlgBgoHits::Initialize(){
       gRootIOSvc->PrepareEvent(ievent);
       Tnowtime=fEvtHeader->GetSecond();
       Ttimegap=Tnowtime -Tlasttime;
-      if(Ttimegap>80){
+      if(Ttimegap>60){
         timecut=Tnowtime;
        std::cout<<"  INFO    []:"<<"Cut last package event!(Event:"<<ievent<<")"<<std::endl;
         break;
@@ -239,8 +260,11 @@ Position.SetXYZ(0.,0.,0.);
 //-------------------------------------------------------------------
 bool DmpAlgBgoHits::ProcessThisEvent(){
 
+  if (fEvtHeader->InjectedExternalTrigger()==false){return false;}
+    //check run mode
  int timenow=fEvtHeader->GetSecond();
 if(timenow<timecut){return false;}
+//if(timenow<58920200){return false;}
  //Reset event class
  fBgoHits->Reset();
  
@@ -263,16 +287,23 @@ if(timenow<timecut){return false;}
     d=DmpBgoBase::GetDynodeID(gid);
     if(b>=22){continue;}//spare channels
 
+//  double computedDy8=adc_dy5[layer][bar][side]*DyCoePar_58[layer][bar][side][0]+DyCoePar_58[layer][bar][side][1];
+//          if(TMath::Abs(computedDy8-adc_dy8[layer][bar][side])<1500) 
     if(d==8&&adc<10000){
       HitsBuffer[l][b][s]=adc/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
     }  
-    else if(d==5&&adc>150&&adc<10000&&tag[l][b][s]!=8){
+    else if(d==5&&adc>150&&adc<14000&&tag[l][b][s]!=8){
+     // std::cout<<"Using dy5,Dy parameters: Slope "<<DyCoePar_58[l][b][s][0]<<",intercept "<<DyCoePar_58[l][b][s][1]<<std::endl;
+     // std::cout<<"Using dy5,MIPs parameters: MPV "<<MipsPar[l][b][s][0]<<std::endl;
+
       double adc_8=adc*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
       HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
     }
     else if(d==2&&adc>150&&tag[l][b ][s]!=5&&tag[l][b][s]!=8){
+ //     std::cout<<"Using dy2,Dy parameters: Slope "<<DyCoePar_58[l][b][s][0]<<",intercept "<<DyCoePar_58[l][b][s][1]<<std::endl;
+ //     std::cout<<"Using dy2,MIPs parameters: MPV "<<MipsPar[l][b][s][0]<<std::endl;
       double adc_5=adc*DyCoePar_25[l][b][s][0]+DyCoePar_25[l][b][s][1];
       double adc_8=adc_5*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
       HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
@@ -284,6 +315,8 @@ if(timenow<timecut){return false;}
     for(short ib=0;ib<22;++ib) {
       //s0*s1 !=0;
       if(HitsBuffer[il][ib][0]!=0&&HitsBuffer[il][ib][1]!=0){
+
+  //    std::cout<<"il"<<il<<"ib"<<ib<<std::endl;
       short gid_bar=DmpBgoBase::ConstructGlobalBarID(il,ib);
       fBgoHits->fGlobalBarID.push_back(gid_bar);
       fBgoHits->fES0.push_back(HitsBuffer[il][ib][0]*23);
