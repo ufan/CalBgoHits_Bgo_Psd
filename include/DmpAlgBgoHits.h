@@ -38,8 +38,10 @@ public:
   bool GetPsdPed();
   bool GetPsdMips();
   bool GetPsdDyCoe(); 
+  void SaveHeader(){fSaveEvtHeader = true;}
 private:
 DmpEvtHeader *fEvtHeader;
+  bool fSaveEvtHeader;
 DmpEvtBgoRaw *fBgoRaw;
 DmpEvtBgoDyCoe *fBgoDyCoe;
 DmpEvtBgoMips  *fBgoMips;
@@ -60,6 +62,9 @@ double PsdMips[2][41][2][3];//layer,bar,side, 0:MPV 1:Gsigma 2:Lwidth
 
 //time cut
   int timecut;
+  double adc_dy2[14][24][2];
+  double adc_dy5[14][24][2];
+  double adc_dy8[14][24][2];
 
 };
 

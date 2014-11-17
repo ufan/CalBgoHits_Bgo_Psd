@@ -22,6 +22,7 @@ DmpAlgBgoHits::DmpAlgBgoHits()
 	fBgoMips(0),
   //      fBgoAtt(0),
 	fBgoHits(0),
+        fSaveEvtHeader(false),
         fPsdRaw(0)
 {
         
@@ -62,6 +63,10 @@ bool DmpAlgBgoHits::GetDyCoePar(){
     l=DmpBgoBase::GetLayerID(gid);
     b=DmpBgoBase::GetBarID(gid);
     s=DmpBgoBase::GetSideID(gid);
+    if(DyCoePar_58[l][b][s][0]==0){
+    DyCoePar_58[l][b][s][0]=fBgoDyCoe->Slp_Dy8vsDy5[i];
+    DyCoePar_58[l][b][s][1]=fBgoDyCoe->Inc_Dy8vsDy5[i];
+    }
  //   DyCoePar_58[l][b][s][0]=fBgoDyCoe->Slp_Dy8vsDy5[i];
  //   DyCoePar_58[l][b][s][1]=fBgoDyCoe->Inc_Dy8vsDy5[i];
     DyCoePar_25[l][b][s][0]=fBgoDyCoe->Slp_Dy5vsDy2[i];
@@ -192,7 +197,9 @@ bool DmpAlgBgoHits::Initialize(){
   fPsdHits = new DmpEvtBgoHits();
   gDataBuffer->RegisterObject("Event/Cal/PsdHits",fPsdHits,"DmpEvtBgoHits");
   
-  //gDataBuffer->RegisterObject("Event/Cal/EventHeader",fEvtHeader,"DmpEvtHeader");
+  if(fSaveEvtHeader){
+    gDataBuffer->RegisterObject("Event/Cal/EventHeader",fEvtHeader,"DmpEvtHeader");
+  }
 
         bool prepareDyCoePar=GetDyCoePar();
 	if(!prepareDyCoePar){
@@ -255,6 +262,15 @@ bool DmpAlgBgoHits::Initialize(){
 //-------------------------------------------------------------------
 bool DmpAlgBgoHits::Reset(){
 Position.SetXYZ(0.,0.,0.);
+  for(short layer=0;layer<14;++layer ){
+    for(short bar=0;bar<24;++bar){ 
+      for(short side=0;side<2;++side){
+	adc_dy2[layer][bar][side]=0;
+	adc_dy5[layer][bar][side]=0; 
+	adc_dy8[layer][bar][side]=0; 
+      }
+    }
+  }
 
 }
 //-------------------------------------------------------------------
@@ -270,6 +286,8 @@ if(timenow<timecut){return false;}
  
 
  Reset();
+ //
+
  //choose dynodes: 2,5 or 8
   double HitsBuffer[14][22][2];
   short  tag[14][22][2];
@@ -278,6 +296,23 @@ if(timenow<timecut){return false;}
   short nSignal=fBgoRaw->fGlobalDynodeID.size();
   short gid=0,l=0,b=0,s=0,d=0;
   double adc=0.;
+ //check the high rate
+  for(short i=0;i<nSignal;++i){
+    gid = fBgoRaw->fGlobalDynodeID[i];
+    adc = fBgoRaw->fADC[i];
+    DmpBgoBase::LoadLBSDID(gid,l,b,s,d);
+    if(d == 2){  
+      adc_dy2[l][b][s] = adc;
+    }
+    else if(d == 5){ 
+      adc_dy5[l][b][s] = adc;
+    }
+    else if(d == 8){
+      adc_dy8[l][b][s] = adc;
+    }  
+  }
+
+
   for(short i=0;i<nSignal;++i){ 
     gid=fBgoRaw->fGlobalDynodeID[i];
     adc=fBgoRaw->fADC[i];
@@ -286,28 +321,39 @@ if(timenow<timecut){return false;}
     s=DmpBgoBase::GetSideID(gid);
     d=DmpBgoBase::GetDynodeID(gid);
     if(b>=22){continue;}//spare channels
-
-//  double computedDy8=adc_dy5[layer][bar][side]*DyCoePar_58[layer][bar][side][0]+DyCoePar_58[layer][bar][side][1];
-//          if(TMath::Abs(computedDy8-adc_dy8[layer][bar][side])<1500) 
-    if(d==8&&adc<10000){
+  bool usingDy8=true;
+  bool usingDy5=true;
+  
+  double computedDy8=adc_dy5[l][b][s]*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
+  double computedDy5=adc_dy2[l][b][s]*DyCoePar_25[l][b][s][0]+DyCoePar_25[l][b][s][1];
+  if(DyCoePar_58[l][b][s][0]!=0){
+    if(TMath::Abs(computedDy8-adc_dy8[l][b][s])>1200&&computedDy8!=0&&adc_dy5[l][b][s]>50){usingDy8=false;} 
+  } 
+  if(DyCoePar_25[l][b][s][0]!=0){
+    if(TMath::Abs(computedDy5-adc_dy5[l][b][s])>1200&&computedDy5!=0&&adc_dy2[l][b][s]>50){usingDy5=false;} 
+  }
+    if(d==8&&adc<14000&&usingDy8==true){
       HitsBuffer[l][b][s]=adc/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
     }  
-    else if(d==5&&adc>150&&adc<14000&&tag[l][b][s]!=8){
-     // std::cout<<"Using dy5,Dy parameters: Slope "<<DyCoePar_58[l][b][s][0]<<",intercept "<<DyCoePar_58[l][b][s][1]<<std::endl;
-     // std::cout<<"Using dy5,MIPs parameters: MPV "<<MipsPar[l][b][s][0]<<std::endl;
-
+    else if(d==5&&adc<14000&&tag[l][b][s]!=8&&usingDy5==true){
       double adc_8=adc*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
       HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
     }
-    else if(d==2&&adc>150&&tag[l][b ][s]!=5&&tag[l][b][s]!=8){
- //     std::cout<<"Using dy2,Dy parameters: Slope "<<DyCoePar_58[l][b][s][0]<<",intercept "<<DyCoePar_58[l][b][s][1]<<std::endl;
+    else if(d==2&&tag[l][b ][s]!=5&&tag[l][b][s]!=8&&usingDy8==false&&usingDy5==false){
+      if(DyCoePar_25[l][b][s][0]<=0){
+      std::cout<<"Using dy2,Dy parameters: Slope "<<DyCoePar_25[l][b][s][0]<<",intercept "<<DyCoePar_25[l][b][s][1]<<std::endl;
+      double adc_8=adc_dy5[l][b][s]*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
+      HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
+      }
+      else{
  //     std::cout<<"Using dy2,MIPs parameters: MPV "<<MipsPar[l][b][s][0]<<std::endl;
       double adc_5=adc*DyCoePar_25[l][b][s][0]+DyCoePar_25[l][b][s][1];
       double adc_8=adc_5*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
       HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
+      }
     }
   }
   //fill Hits event class
@@ -319,15 +365,15 @@ if(timenow<timecut){return false;}
   //    std::cout<<"il"<<il<<"ib"<<ib<<std::endl;
       short gid_bar=DmpBgoBase::ConstructGlobalBarID(il,ib);
       fBgoHits->fGlobalBarID.push_back(gid_bar);
-      fBgoHits->fES0.push_back(HitsBuffer[il][ib][0]*23);
-      fBgoHits->fES1.push_back(HitsBuffer[il][ib][1]*23);
+      fBgoHits->fES0.push_back(HitsBuffer[il][ib][0]*23.6*1.077);
+      fBgoHits->fES1.push_back(HitsBuffer[il][ib][1]*23.6*1.077);
       //  if(TMath::Abs(Hi tsBuffer[il][ib][0]/HitsBuffer[il][ib][1]-1)<0.4){//1-exp(-600/lambda)=0.36; (lambda=1350mm)
           if(HitsBuffer[il][ib][0]*HitsBuffer[il][ib][1]*MipsPar[il][ib][0][0]*MipsPar[il][ib][1][0]<0){
 	DmpLogError<<"Hits0= "<<HitsBuffer[il][ib][0]<<" Hits1= "<<HitsBuffer[il][ib][1]<<" Mip_MPV[0]="<<MipsPar[il][ib][0][0]<<" Mip_MPV[1]"<<MipsPar[il][ib][1][0]<<DmpLogEndl;
 	  }
           double combinedhits=TMath::Sqrt(HitsBuffer[il][ib][0]*HitsBuffer[il][ib][1]*MipsPar[il][ib][0][0]*MipsPar[il][ib][1][0])/MipsPar[il][ib][2][0]; 
         //DmpLogWarning<<"Layer="<<il<<" Bar="<<ib<<" Event="<<gCore->GetCurrentEventID()<<" combinedhits:"<<combinedhits<<" ADC"<<" MipsPar:"<<MipsPar[il][ib][2][0]<<DmpLogEndl;
-          fBgoHits->fEnergy.push_back(combinedhits*23);
+          fBgoHits->fEnergy.push_back(combinedhits*23.6*1.077);
 	  double pos=(TMath::Log(HitsBuffer[il][ib][0]/HitsBuffer[il][ib][1])-AttPar[il][ib][1])/AttPar[il][ib][0]*10-300;
 	  if(il%2==0){ 
             Position.SetX(pos);
