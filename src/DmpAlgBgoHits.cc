@@ -326,12 +326,8 @@ if(timenow<timecut){return false;}
   
   double computedDy8=adc_dy5[l][b][s]*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
   double computedDy5=adc_dy2[l][b][s]*DyCoePar_25[l][b][s][0]+DyCoePar_25[l][b][s][1];
-  if(DyCoePar_58[l][b][s][0]!=0){
-    if(TMath::Abs(computedDy8-adc_dy8[l][b][s])>1200&&computedDy8!=0&&adc_dy5[l][b][s]>50){usingDy8=false;} 
-  } 
-  if(DyCoePar_25[l][b][s][0]!=0){
-    if(TMath::Abs(computedDy5-adc_dy5[l][b][s])>1200&&computedDy5!=0&&adc_dy2[l][b][s]>50){usingDy5=false;} 
-  }
+    if(TMath::Abs(computedDy8-adc_dy8[l][b][s])>1500&&computedDy8!=0&&adc_dy5[l][b][s]>50){usingDy8=false;} 
+    if(TMath::Abs(computedDy5-adc_dy5[l][b][s])>1500&&computedDy5!=0&&adc_dy2[l][b][s]>50){usingDy5=false;} 
     if(d==8&&adc<14000&&usingDy8==true){
       HitsBuffer[l][b][s]=adc/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
@@ -341,19 +337,12 @@ if(timenow<timecut){return false;}
       HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
     }
-    else if(d==2&&tag[l][b ][s]!=5&&tag[l][b][s]!=8&&usingDy8==false&&usingDy5==false){
-      if(DyCoePar_25[l][b][s][0]<=0){
-      std::cout<<"Using dy2,Dy parameters: Slope "<<DyCoePar_25[l][b][s][0]<<",intercept "<<DyCoePar_25[l][b][s][1]<<std::endl;
-      double adc_8=adc_dy5[l][b][s]*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
-      HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
-      }
-      else{
+    else if(d==2&&tag[l][b ][s]!=5&&tag[l][b][s]!=8){
  //     std::cout<<"Using dy2,MIPs parameters: MPV "<<MipsPar[l][b][s][0]<<std::endl;
       double adc_5=adc*DyCoePar_25[l][b][s][0]+DyCoePar_25[l][b][s][1];
       double adc_8=adc_5*DyCoePar_58[l][b][s][0]+DyCoePar_58[l][b][s][1];
       HitsBuffer[l][b][s]=adc_8/MipsPar[l][b][s][0];
       tag[l][b][s]=d;
-      }
     }
   }
   //fill Hits event class
